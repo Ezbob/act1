@@ -48,25 +48,25 @@ namespace Act1 {
 
     public:
         explicit Actor(actor_id_t a_id, ReactionType &&r)
-            : __details({moodycamel::BlockingReaderWriterQueue<Evelope_t>{}, std::move(r), a_id}) {}
+            : __details({
+                moodycamel::BlockingReaderWriterQueue<Evelope_t>{},
+                std::move(r),
+                a_id
+            }) {}
 
         explicit Actor(actor_id_t a_id)
-            : __details({moodycamel::BlockingReaderWriterQueue<Evelope_t>{}, DEFAULT_REACTION, a_id}) {}
-
+            : __details({
+                moodycamel::BlockingReaderWriterQueue<Evelope_t>{},
+                DEFAULT_REACTION,
+                a_id
+            }) {}
 
         inline bool send(Actor<T, Evelope_t> &a, T const && msg) {
             return a.__details.queue.try_enqueue(Evelope_t{this->__details.id, std::move(msg)});
         }
 
         inline void run(void) {
-            if (!__details.is_running) {
-                __details.is_running = true;
-                __details.__react(*this);
-            }
-        }
-
-        inline void stop(void) {
-            __details.should_run = false;
+            __details.__react(*this);
         }
 
         inline actor_id_t actor_id(void) const noexcept {
@@ -83,12 +83,10 @@ namespace Act1 {
             ReactionType reaction;
 
             const actor_id_t id;
-            bool should_run = true;
-            bool is_running = false;
 
             void __react(Actor<T, Evelope_t> &a) {
                 thread_local Evelope_t item;
-                while ( should_run ) {
+                for (;;) {
                     queue.wait_dequeue(item);
                     reaction(a, item);
                 }
