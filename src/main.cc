@@ -1,88 +1,80 @@
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <ostream>
-#include "readerwriterqueue.h"
+
 #include <thread>
 #include <chrono>
+#include <tuple>
 
-namespace Act1 {
+#include "act1.hh"
 
-    using actor_id_t = std::uint64_t;
-
-    template<typename T>
-    struct MessageEnvelope {
-        actor_id_t sender_id;
-        T data;
-    };
-
-    template<typename T, typename Evelope_t = MessageEnvelope<T>>
-    class Actor {
-    protected:
-        using EvelopeType = Evelope_t;
-
-        virtual void react(EvelopeType const &envelope) = 0;
-
-    public:
-        explicit Actor(actor_id_t a_id)
-            : __details({moodycamel::BlockingReaderWriterQueue<Evelope_t>{}, a_id}) {}
-
-        bool send(Actor<T, Evelope_t> &a, T const && msg) {
-            return a.__details.queue.try_enqueue(Evelope_t{a.__details.id, msg});
-        }
-
-        inline void run(void) {
-            __details.__react(*this);
-        }
-
-        inline actor_id_t actor_id(void) const noexcept {
-            return __details.id;
-        }
-
-    private:
-        struct {
-            moodycamel::BlockingReaderWriterQueue<Evelope_t> queue;
-            const actor_id_t id;
-
-            void __react(Actor<T, Evelope_t> &a) {
-                thread_local Evelope_t item;
-                for (;;) {
-                    queue.wait_dequeue(item);
-                    a.react(item);
-                }
-            }
-        } __details;
-    };
-
-};
-
-class MActor : public Act1::Actor<int> {
+class ActorReactionB {
+    Act1::Actor<int> &a_actor;
 public:
-    MActor() : Act1::Actor<int>(0) {}
-protected:
-    void react(EvelopeType const &m) {
-        std::cout << "1 -> " << m.sender_id << " | " << m.data << "\n";
+    ActorReactionB(Act1::Actor<int> &a): a_actor(a) {}
+
+    void operator()(Act1::Actor<int> &actor, Act1::MessageEnvelope<int> const &msg) {
+        std::cout << "Sending to actor b.. " << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        actor.send(a_actor, -1);
+        std::cout << "Sent\n";
+        actor.stop();
     }
 };
 
+class ActorReactionA {
+    Act1::Actor<int> &b_actor;
+public:
+    ActorReactionA(Act1::Actor<int> &b): b_actor(b) {}
+
+    void operator()(Act1::Actor<int> &actor, Act1::MessageEnvelope<int> const &msg) {
+        if (msg.sender_id == actor.actor_id()) {
+            return;
+        }
+        if (msg.data == -1) {
+            std::cout << "good bye" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            actor.stop();
+        }
+    }
+};
 
 int main() {
 
-    MActor a;
+    Act1::Actor<int> a(0);
+    Act1::Actor<int> b(1);
 
-    a.send(a, 2);
+    a.reaction(ActorReactionA(b));
+    b.reaction(ActorReactionB(a));
 
-    std::cout << a.actor_id() << std::endl;
-
-    std::thread w(&MActor::run, &a);
 /*
-
-    std::thread r([&] {
-
+    a.reaction([&b](auto &actor, auto const & r) {
+        if (r.sender_id != actor.actor_id()) {
+            if (r.data == -1) {
+                std::cout << "good bye" << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                actor.stop();
+            }
+        }
     });
-    */
+
+    b.reaction([&a](auto &actor, auto const & r) {
+        std::cout << "Sending to actor b.. " << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        actor.send(a, -1);
+        std::cout << "Sent\n";
+        actor.stop();
+    });
+*/
+
+    b.send(b, -1);
+
+    std::thread w(&Act1::Actor<int>::run, &a);
+    std::thread r(&Act1::Actor<int>::run, &b);
 
     w.join();
-//    r.join();
+    r.join();
 
 
 //    assert(queue.size_approx() == 0);
