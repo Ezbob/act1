@@ -37,60 +37,59 @@ namespace Act1 {
         T data;
     };
 
-    template<typename T, typename Evelope_t = MessageEnvelope<T>>
+    template<typename DerivedClass>
     class Actor {
     protected:
-        using EvelopeType = Evelope_t;
-        using ReactionType = std::function<void(Actor<T, Evelope_t> &, Evelope_t const &)>;
-
-    private:
-        const static void DEFAULT_REACTION(Actor<T, Evelope_t> &, Evelope_t const &) {};
+        using BaseClass = Actor<DerivedClass>;
 
     public:
-        explicit Actor(actor_id_t a_id, ReactionType &&r)
-            : __details({
-                moodycamel::BlockingReaderWriterQueue<Evelope_t>{},
-                std::move(r),
-                a_id
-            }) {}
-
         explicit Actor(actor_id_t a_id)
             : __details({
-                moodycamel::BlockingReaderWriterQueue<Evelope_t>{},
-                DEFAULT_REACTION,
+                moodycamel::BlockingReaderWriterQueue<std::function<void(void)>>{},
                 a_id
             }) {}
 
-        inline bool send(Actor<T, Evelope_t> &a, T const && msg) {
-            return a.__details.queue.try_enqueue(Evelope_t{this->__details.id, std::move(msg)});
+        template<typename U, typename ActorSubType>
+        inline bool send(Actor<ActorSubType> &actor, U const & msg) {
+            return actor.queue()
+                .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
+                    static_cast<ActorSubType &>(actor).reaction(env);
+                }
+            );
         }
 
+        template<typename U, typename ActorSubType>
+        inline bool send(Actor<ActorSubType> &actor, U const && msg) {
+            return actor.queue()
+                .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
+                    static_cast<ActorSubType &>(actor).reaction(env);
+                }
+            );
+        }
+
+        template<typename T>
+        void reaction(MessageEnvelope<T> const &) {};
+
         inline void run(void) {
-            __details.__react(*this);
+            thread_local std::function<void(void)> reaction;
+            for (;;) {
+                __details.queue.wait_dequeue(reaction);
+                reaction();
+            }
         }
 
         inline actor_id_t actor_id(void) const noexcept {
             return __details.id;
         }
 
-        inline void reaction(ReactionType && f) {
-            __details.reaction = std::move(f);
+        inline moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue() {
+            return __details.queue;
         }
 
     private:
         struct {
-            moodycamel::BlockingReaderWriterQueue<Evelope_t> queue;
-            ReactionType reaction;
-
+            moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> queue;
             const actor_id_t id;
-
-            void __react(Actor<T, Evelope_t> &a) {
-                thread_local Evelope_t item;
-                for (;;) {
-                    queue.wait_dequeue(item);
-                    reaction(a, item);
-                }
-            }
         } __details;
     };
 

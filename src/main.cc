@@ -6,29 +6,63 @@
 #include <thread>
 #include <chrono>
 #include "act1.hh"
+#include <vector>
+
+class PongActor;
+
+class PingActor : public Act1::Actor<PingActor> {
+public:
+    Act1::Actor<PongActor> *pong_actor = nullptr;
+
+    PingActor(Act1::actor_id_t id) : BaseClass(id) {}
+
+    void reaction(const Act1::MessageEnvelope<int> &m) {
+        std::cout << "Ping " << m.data << "\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        send(*pong_actor, m.data + 1);
+    }
+
+    void reaction(const Act1::MessageEnvelope<std::string> &m) {
+        std::cout << "Ping " << m.data << "\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        send(*pong_actor, m.data);
+    }
+};
+
+class PongActor : public Act1::Actor<PongActor> {
+public:
+    Act1::Actor<PingActor> *ping_actor = nullptr;
+
+    PongActor(Act1::actor_id_t id) : BaseClass(id) {}
+
+    void reaction(const Act1::MessageEnvelope<int> &m) {
+        std::cout << "Pong " << m.data << "\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        send(*ping_actor, m.data + 1);
+    }
+
+    void reaction(const Act1::MessageEnvelope<std::string> &m) {
+        std::cout << "Pong " << m.data << "\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        send(*ping_actor, m.data);
+    }
+};
 
 
 int main() {
 
-    Act1::Actor<int> a(0);
-    Act1::Actor<int> b(1);
 
-    a.reaction([&b](auto &actor, auto const & msg) {
-        std::cout << "Ping " << msg.data << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        actor.send(b, msg.data + 1);
-    });
+    PingActor ping(0);
+    PongActor pong(1);
 
-    b.reaction([&a](auto &actor, auto const & msg) {
-        std::cout << "Pong " << msg.data << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        actor.send(a, msg.data + 1);
-    });
+    ping.pong_actor = &pong;
+    pong.ping_actor = &ping;
 
-    b.send(a, 0);
+    pong.send(ping, 0);
+    ping.send<std::string>(pong, "Hello");
 
-    std::thread w(&Act1::Actor<int>::run, &a);
-    std::thread r(&Act1::Actor<int>::run, &b);
+    std::thread w(&PingActor::run, &ping);
+    std::thread r(&PongActor::run, &pong);
 
     w.join();
     r.join();
