@@ -37,11 +37,7 @@ namespace Act1 {
         T data;
     };
 
-    template<typename DerivedClass>
     class Actor {
-    protected:
-        using BaseClass = Actor<DerivedClass>;
-
     public:
         explicit Actor(actor_id_t a_id)
             : __details({
@@ -50,25 +46,22 @@ namespace Act1 {
             }) {}
 
         template<typename U, typename ActorSubType>
-        inline bool send(Actor<ActorSubType> &actor, U const & msg) {
+        inline bool send(ActorSubType &actor, U const & msg) {
             return actor.queue()
                 .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
-                    static_cast<ActorSubType &>(actor).reaction(env);
+                    actor.reaction(env);
                 }
             );
         }
 
         template<typename U, typename ActorSubType>
-        inline bool send(Actor<ActorSubType> &actor, U const && msg) {
+        inline bool send(ActorSubType &actor, U const && msg) {
             return actor.queue()
                 .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
-                    static_cast<ActorSubType &>(actor).reaction(env);
+                    actor.reaction(env);
                 }
             );
         }
-
-        template<typename T>
-        void reaction(MessageEnvelope<T> const &) {};
 
         inline void run(void) {
             thread_local std::function<void(void)> reaction;

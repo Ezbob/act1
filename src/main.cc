@@ -6,15 +6,16 @@
 #include <thread>
 #include <chrono>
 #include "act1.hh"
-#include <vector>
+#include <map>
+
 
 class PongActor;
 
-class PingActor : public Act1::Actor<PingActor> {
+class PingActor : public Act1::Actor {
 public:
-    Act1::Actor<PongActor> *pong_actor = nullptr;
+    PongActor *pong_actor = nullptr;
 
-    PingActor(Act1::actor_id_t id) : BaseClass(id) {}
+    PingActor(Act1::actor_id_t id) : Act1::Actor(id) {}
 
     void reaction(const Act1::MessageEnvelope<int> &m) {
         std::cout << "Ping " << m.data << "\n";
@@ -29,11 +30,11 @@ public:
     }
 };
 
-class PongActor : public Act1::Actor<PongActor> {
+class PongActor : public Act1::Actor {
 public:
-    Act1::Actor<PingActor> *ping_actor = nullptr;
+    PingActor *ping_actor = nullptr;
 
-    PongActor(Act1::actor_id_t id) : BaseClass(id) {}
+    PongActor(Act1::actor_id_t id) :  Act1::Actor(id) {}
 
     void reaction(const Act1::MessageEnvelope<int> &m) {
         std::cout << "Pong " << m.data << "\n";
@@ -50,7 +51,6 @@ public:
 
 
 int main() {
-
 
     PingActor ping(0);
     PongActor pong(1);
