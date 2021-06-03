@@ -1,3 +1,4 @@
 [submodule "readerwriterqueue"]
 	path = readerwriterqueue
-	url = git@github.com:cameron314/readerwriterqueue.git
+	url = https://github.com/cameron314/readerwriterqueue.git
+	branch = v1.0.5
