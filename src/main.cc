@@ -8,14 +8,11 @@
 #include "act1.hh"
 #include <map>
 
-
 class PongActor;
 
 class PingActor : public Act1::Actor {
 public:
     PongActor *pong_actor = nullptr;
-
-    PingActor(Act1::actor_id_t id) : Act1::Actor(id) {}
 
     void reaction(const Act1::MessageEnvelope<int> &m) {
         std::cout << "Ping " << m.data << "\n";
@@ -34,8 +31,6 @@ class PongActor : public Act1::Actor {
 public:
     PingActor *ping_actor = nullptr;
 
-    PongActor(Act1::actor_id_t id) :  Act1::Actor(id) {}
-
     void reaction(const Act1::MessageEnvelope<int> &m) {
         std::cout << "Pong " << m.data << "\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -52,8 +47,8 @@ public:
 
 int main() {
 
-    PingActor ping(0);
-    PongActor pong(1);
+    PingActor ping;
+    PongActor pong;
 
     ping.pong_actor = &pong;
     pong.ping_actor = &ping;

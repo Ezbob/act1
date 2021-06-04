@@ -29,61 +29,46 @@
 
 namespace Act1 {
 
-    using actor_id_t = std::uint64_t;
+    class Actor;
 
     template<typename T>
     struct MessageEnvelope {
-        actor_id_t sender_id;
+        Actor *sender_id;
         T data;
     };
 
     class Actor {
     public:
-        explicit Actor(actor_id_t a_id)
-            : __details({
-                moodycamel::BlockingReaderWriterQueue<std::function<void(void)>>{},
-                a_id
-            }) {}
-
         template<typename U, typename ActorSubType>
         inline bool send(ActorSubType &actor, U const & msg) {
             return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
+                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
                     actor.reaction(env);
-                }
-            );
+                });
         }
 
         template<typename U, typename ActorSubType>
         inline bool send(ActorSubType &actor, U const && msg) {
             return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{actor_id(), std::move(msg)}] {
+                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
                     actor.reaction(env);
-                }
-            );
+                });
         }
 
         inline void run(void) {
             thread_local std::function<void(void)> reaction;
             for (;;) {
-                __details.queue.wait_dequeue(reaction);
+                __queue.wait_dequeue(reaction);
                 reaction();
             }
         }
 
-        inline actor_id_t actor_id(void) const noexcept {
-            return __details.id;
-        }
-
         inline moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue() {
-            return __details.queue;
+            return __queue;
         }
 
     private:
-        struct {
-            moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> queue;
-            const actor_id_t id;
-        } __details;
+        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> __queue;
     };
 
 };
