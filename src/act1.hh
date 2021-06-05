@@ -44,7 +44,7 @@ namespace Act1 {
     class Actor {
     public:
         template<typename U, typename ActorSubType>
-        inline bool send(ActorSubType &actor, U const & msg) {
+        bool send(ActorSubType &actor, U const & msg) {
             return actor.queue()
                 .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
                     actor.reaction(env);
@@ -52,51 +52,23 @@ namespace Act1 {
         }
 
         template<typename U, typename ActorSubType>
-        inline bool send(ActorSubType &actor, U const && msg) {
+        bool send(ActorSubType &actor, U const && msg) {
             return actor.queue()
                 .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
                     actor.reaction(env);
                 });
         }
 
-        inline bool signal(Actor &actor, ActorSignal signal) {
-            return actor.queue()
-                .try_enqueue([&actor, signal] {
-                    actor.signal_reaction(signal);
-                });
-        }
+        bool signal(Actor &actor, ActorSignal signal);
 
-        inline bool signal(ActorSignal signal) {
-            return queue()
-                .try_enqueue([this, signal] {
-                    signal_reaction(signal);
-                });
-        }
+        bool signal(ActorSignal signal);
 
-        inline void run(void) {
-            thread_local std::function<void(void)> reaction;
-            for (;;) {
-                __queue.wait_dequeue(reaction);
-                reaction();
+        void run(void);
 
-                if (__received_kill) {
-                    break;
-                }
-            }
-        }
-
-        inline moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue() {
-            return __queue;
-        }
+        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue();
 
     private:
-        void signal_reaction(ActorSignal signal) {
-            switch (signal) {
-                case ActorSignal::KILL:
-                    __received_kill = true;
-                    break;
-            }
-        }
+        void signal_reaction(ActorSignal signal);
 
         moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> __queue;
         bool __received_kill = false;
