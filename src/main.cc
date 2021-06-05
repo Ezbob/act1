@@ -34,6 +34,12 @@ public:
     void reaction(const Act1::MessageEnvelope<int> &m) {
         std::cout << "Pong " << m.data << "\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        if (m.data >= 10) {
+            signal(*ping_actor, Act1::ActorSignal::KILL);
+            signal(Act1::ActorSignal::KILL);
+        }
+
         send(*ping_actor, m.data + 1);
     }
 

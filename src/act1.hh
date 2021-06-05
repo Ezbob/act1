@@ -37,6 +37,10 @@ namespace Act1 {
         T data;
     };
 
+    enum class ActorSignal {
+        KILL
+    };
+
     class Actor {
     public:
         template<typename U, typename ActorSubType>
@@ -55,11 +59,29 @@ namespace Act1 {
                 });
         }
 
+        inline bool signal(Actor &actor, ActorSignal signal) {
+            return actor.queue()
+                .try_enqueue([&actor, signal] {
+                    actor.signal_reaction(signal);
+                });
+        }
+
+        inline bool signal(ActorSignal signal) {
+            return queue()
+                .try_enqueue([this, signal] {
+                    signal_reaction(signal);
+                });
+        }
+
         inline void run(void) {
             thread_local std::function<void(void)> reaction;
             for (;;) {
                 __queue.wait_dequeue(reaction);
                 reaction();
+
+                if (__received_kill) {
+                    break;
+                }
             }
         }
 
@@ -68,7 +90,16 @@ namespace Act1 {
         }
 
     private:
+        void signal_reaction(ActorSignal signal) {
+            switch (signal) {
+                case ActorSignal::KILL:
+                    __received_kill = true;
+                    break;
+            }
+        }
+
         moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> __queue;
+        bool __received_kill = false;
     };
 
 };
