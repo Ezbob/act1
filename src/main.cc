@@ -14,15 +14,13 @@ class PingActor : public Act1::Actor {
 public:
     PongActor *pong_actor = nullptr;
 
-    void reaction(const Act1::MessageEnvelope<int> &m) {
+    void reaction(const Act1::Message<int> &m) {
         std::cout << "Ping " << m.data << "\n";
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         send(*pong_actor, m.data + 1);
     }
 
-    void reaction(const Act1::MessageEnvelope<std::string> &m) {
+    void reaction(const Act1::Message<std::string> &m) {
         std::cout << "Ping " << m.data << "\n";
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         send(*pong_actor, m.data);
     }
 };
@@ -31,9 +29,8 @@ class PongActor : public Act1::Actor {
 public:
     PingActor *ping_actor = nullptr;
 
-    void reaction(const Act1::MessageEnvelope<int> &m) {
+    void reaction(const Act1::Message<int> &m) {
         std::cout << "Pong " << m.data << "\n";
-        std::this_thread::sleep_for(std::chrono::seconds(1));
 
         if (m.data >= 10) {
             signal(*ping_actor, Act1::ActorSignal::KILL);
@@ -43,9 +40,8 @@ public:
         send(*ping_actor, m.data + 1);
     }
 
-    void reaction(const Act1::MessageEnvelope<std::string> &m) {
+    void reaction(const Act1::Message<std::string> &m) {
         std::cout << "Pong " << m.data << "\n";
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         send(*ping_actor, m.data);
     }
 };
@@ -67,5 +63,4 @@ int main() {
 
     w.join();
     r.join();
-
 }

@@ -2,15 +2,12 @@ cmake_minimum_required(VERSION 3.15)
 
 project(act1 CXX)
 
-add_subdirectory(readerwriterqueue EXCLUDE_FROM_ALL)
-
 find_package(Threads)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
 add_library(libact1 SHARED "")
 target_sources(libact1 PRIVATE "src/act1.cc")
-target_include_directories(libact1 PUBLIC "${CMAKE_CURRENT_LIST_DIR}/readerwriterqueue")
 target_link_libraries(libact1 PUBLIC Threads::Threads)
 
 add_executable(main "")

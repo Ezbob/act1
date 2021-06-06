@@ -23,17 +23,19 @@
 #ifndef _HEADER_FILE_act1_20210525191648_
 #define _HEADER_FILE_act1_20210525191648_
 
-#include "readerwriterqueue.h"
 #include <cstdint>
 #include <functional>
+#include <condition_variable>
+#include <mutex>
+#include <queue>
 
 namespace Act1 {
 
     class Actor;
 
     template<typename T>
-    struct MessageEnvelope {
-        Actor *sender_id;
+    struct Message {
+        Actor *sender;
         T data;
     };
 
@@ -41,36 +43,61 @@ namespace Act1 {
         KILL
     };
 
+    template<typename T>
+    class MessageQueue {
+    public:
+        void enqueue(T &&m) {
+            std::lock_guard<std::mutex> lock(__queue_mutex);
+            __queue.emplace(std::move(m));
+            __queue_wait_condition.notify_all();
+        }
+
+        void dequeue(T & item) {
+            std::unique_lock<std::mutex> lock(__queue_mutex);
+            __queue_wait_condition.wait(lock, [this] {
+                return __queue.size() > 0;
+            });
+
+            item = std::move(__queue.front());
+            __queue.pop();
+        }
+
+    private:
+        std::queue<T> __queue;
+        std::condition_variable __queue_wait_condition;
+        std::mutex __queue_mutex;
+    };
+
     class Actor {
     public:
         template<typename U, typename ActorSubType>
-        bool send(ActorSubType &actor, U const & msg) {
-            return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
+        void send(ActorSubType &actor, U const & msg) {
+            actor.queue()
+                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
                     actor.reaction(env);
                 });
         }
 
         template<typename U, typename ActorSubType>
-        bool send(ActorSubType &actor, U const && msg) {
-            return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
+        void send(ActorSubType &actor, U const && msg) {
+            actor.queue()
+                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
                     actor.reaction(env);
                 });
         }
 
-        bool signal(Actor &actor, ActorSignal signal);
+        void signal(Actor &actor, ActorSignal signal);
 
-        bool signal(ActorSignal signal);
+        void signal(ActorSignal signal);
 
         void run(void);
 
-        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue();
+        MessageQueue<std::function<void(void)>> &queue();
 
     private:
         void signal_reaction(ActorSignal signal);
 
-        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> __queue;
+        MessageQueue<std::function<void(void)>> __queue;
         bool __received_kill = false;
     };
 

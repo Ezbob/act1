@@ -24,18 +24,17 @@
 
 using namespace Act1;
 
-bool Act1::Actor::signal(Actor &actor, ActorSignal signal) {
-    return actor.queue()
-        .try_enqueue([&actor, signal] {
+void Act1::Actor::signal(Actor &actor, ActorSignal signal) {
+    actor.queue()
+        .enqueue([&actor, signal] {
             actor.signal_reaction(signal);
         });
 }
 
-bool Act1::Actor::signal(ActorSignal signal) {
-    return queue()
-        .try_enqueue([this, signal] {
-            signal_reaction(signal);
-        });
+void Act1::Actor::signal(ActorSignal signal) {
+    __queue.enqueue([this, signal] {
+        signal_reaction(signal);
+    });
 }
 
 void Act1::Actor::signal_reaction(ActorSignal signal) {
@@ -49,7 +48,7 @@ void Act1::Actor::signal_reaction(ActorSignal signal) {
 void Act1::Actor::run(void) {
     thread_local std::function<void(void)> reaction;
     for (;;) {
-        __queue.wait_dequeue(reaction);
+        __queue.dequeue(reaction);
         reaction();
 
         if (__received_kill) {
@@ -58,6 +57,6 @@ void Act1::Actor::run(void) {
     }
 }
 
-moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &Act1::Actor::queue() {
+MessageQueue<std::function<void(void)>> &Act1::Actor::queue() {
     return __queue;
 }
