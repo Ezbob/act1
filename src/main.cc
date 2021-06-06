@@ -10,6 +10,7 @@
 
 class PongActor;
 
+
 class PingActor : public Act1::Actor {
 public:
     PongActor *pong_actor = nullptr;
@@ -24,6 +25,7 @@ public:
         send(*pong_actor, m.data);
     }
 };
+
 
 class PongActor : public Act1::Actor {
 public:
@@ -58,8 +60,8 @@ int main() {
     pong.send(ping, 0);
     ping.send<std::string>(pong, "Hello");
 
-    std::thread w(&PingActor::run, &ping);
-    std::thread r(&PongActor::run, &pong);
+    std::thread w = Act1::start_actor(ping);
+    std::thread r = Act1::start_actor(pong);
 
     w.join();
     r.join();

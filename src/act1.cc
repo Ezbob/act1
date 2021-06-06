@@ -57,6 +57,26 @@ void Act1::Actor::run(void) {
     }
 }
 
-MessageQueue<std::function<void(void)>> &Act1::Actor::queue() {
+MessageQueue &Act1::Actor::queue() {
     return __queue;
+}
+
+void Act1::MessageQueue::enqueue(std::function<void(void)> &&m) {
+    std::lock_guard<std::mutex> lock(__queue_mutex);
+    __queue.emplace(std::move(m));
+    __queue_wait_condition.notify_one();
+}
+
+void Act1::MessageQueue::dequeue(std::function<void(void)> & item) {
+    std::unique_lock<std::mutex> lock(__queue_mutex);
+    __queue_wait_condition.wait(lock, [this] {
+        return __queue.size() > 0;
+    });
+
+    item = std::move(__queue.front());
+    __queue.pop();
+}
+
+std::thread Act1::start_actor(Actor &a) {
+    return std::thread(&Actor::run, &a);
 }

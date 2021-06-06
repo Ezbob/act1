@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <functional>
 #include <condition_variable>
+#include <thread>
 #include <mutex>
 #include <queue>
 
@@ -43,27 +44,13 @@ namespace Act1 {
         KILL
     };
 
-    template<typename T>
     class MessageQueue {
     public:
-        void enqueue(T &&m) {
-            std::lock_guard<std::mutex> lock(__queue_mutex);
-            __queue.emplace(std::move(m));
-            __queue_wait_condition.notify_all();
-        }
-
-        void dequeue(T & item) {
-            std::unique_lock<std::mutex> lock(__queue_mutex);
-            __queue_wait_condition.wait(lock, [this] {
-                return __queue.size() > 0;
-            });
-
-            item = std::move(__queue.front());
-            __queue.pop();
-        }
+        void enqueue(std::function<void(void)> && m);
+        void dequeue(std::function<void(void)> & item);
 
     private:
-        std::queue<T> __queue;
+        std::queue<std::function<void(void)>> __queue;
         std::condition_variable __queue_wait_condition;
         std::mutex __queue_mutex;
     };
@@ -92,14 +79,16 @@ namespace Act1 {
 
         void run(void);
 
-        MessageQueue<std::function<void(void)>> &queue();
+        MessageQueue &queue();
 
     private:
         void signal_reaction(ActorSignal signal);
 
-        MessageQueue<std::function<void(void)>> __queue;
+        MessageQueue __queue;
         bool __received_kill = false;
     };
+
+    std::thread start_actor(Actor &a);
 
 };
 
