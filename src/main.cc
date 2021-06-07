@@ -6,7 +6,6 @@
 #include <thread>
 #include <chrono>
 #include "act1.hh"
-#include <map>
 
 class PongActor;
 

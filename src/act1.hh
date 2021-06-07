@@ -50,9 +50,9 @@ namespace Act1 {
         void dequeue(std::function<void(void)> & item);
 
     private:
-        std::queue<std::function<void(void)>> __queue;
-        std::condition_variable __queue_wait_condition;
-        std::mutex __queue_mutex;
+        std::queue<std::function<void(void)>> m_queue;
+        std::condition_variable m_queue_wait_condition;
+        std::mutex m_queue_mutex;
     };
 
     class Actor {
@@ -84,8 +84,8 @@ namespace Act1 {
     private:
         void signal_reaction(ActorSignal signal);
 
-        MessageQueue __queue;
-        bool __received_kill = false;
+        MessageQueue m_queue;
+        bool m_received_kill = false;
     };
 
     std::thread start_actor(Actor &a);

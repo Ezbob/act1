@@ -32,7 +32,7 @@ void Act1::Actor::signal(Actor &actor, ActorSignal signal) {
 }
 
 void Act1::Actor::signal(ActorSignal signal) {
-    __queue.enqueue([this, signal] {
+    m_queue.enqueue([this, signal] {
         signal_reaction(signal);
     });
 }
@@ -40,7 +40,7 @@ void Act1::Actor::signal(ActorSignal signal) {
 void Act1::Actor::signal_reaction(ActorSignal signal) {
     switch (signal) {
         case ActorSignal::KILL:
-            __received_kill = true;
+            m_received_kill = true;
             break;
     }
 }
@@ -48,33 +48,33 @@ void Act1::Actor::signal_reaction(ActorSignal signal) {
 void Act1::Actor::run(void) {
     thread_local std::function<void(void)> reaction;
     for (;;) {
-        __queue.dequeue(reaction);
+        m_queue.dequeue(reaction);
         reaction();
 
-        if (__received_kill) {
+        if (m_received_kill) {
             break;
         }
     }
 }
 
 MessageQueue &Act1::Actor::queue() {
-    return __queue;
+    return m_queue;
 }
 
 void Act1::MessageQueue::enqueue(std::function<void(void)> &&m) {
-    std::lock_guard<std::mutex> lock(__queue_mutex);
-    __queue.emplace(std::move(m));
-    __queue_wait_condition.notify_one();
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    m_queue.emplace(std::move(m));
+    m_queue_wait_condition.notify_one();
 }
 
 void Act1::MessageQueue::dequeue(std::function<void(void)> & item) {
-    std::unique_lock<std::mutex> lock(__queue_mutex);
-    __queue_wait_condition.wait(lock, [this] {
-        return __queue.size() > 0;
+    std::unique_lock<std::mutex> lock(m_queue_mutex);
+    m_queue_wait_condition.wait(lock, [this] {
+        return ! m_queue.empty();
     });
 
-    item = std::move(__queue.front());
-    __queue.pop();
+    item = std::move(m_queue.front());
+    m_queue.pop();
 }
 
 std::thread Act1::start_actor(Actor &a) {
