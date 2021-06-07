@@ -24,24 +24,23 @@
 
 using namespace Act1;
 
-bool Act1::Actor::signal(Actor &actor, ActorSignal signal) {
-    return actor.queue()
-        .try_enqueue([&actor, signal] {
+void Act1::Actor::signal(Actor &actor, ActorSignal signal) {
+    actor.queue()
+        .enqueue([&actor, signal] {
             actor.signal_reaction(signal);
         });
 }
 
-bool Act1::Actor::signal(ActorSignal signal) {
-    return queue()
-        .try_enqueue([this, signal] {
-            signal_reaction(signal);
-        });
+void Act1::Actor::signal(ActorSignal signal) {
+    m_queue.enqueue([this, signal] {
+        signal_reaction(signal);
+    });
 }
 
 void Act1::Actor::signal_reaction(ActorSignal signal) {
     switch (signal) {
         case ActorSignal::KILL:
-            __received_kill = true;
+            m_received_kill = true;
             break;
     }
 }
@@ -49,15 +48,35 @@ void Act1::Actor::signal_reaction(ActorSignal signal) {
 void Act1::Actor::run(void) {
     thread_local std::function<void(void)> reaction;
     for (;;) {
-        __queue.wait_dequeue(reaction);
+        m_queue.dequeue(reaction);
         reaction();
 
-        if (__received_kill) {
+        if (m_received_kill) {
             break;
         }
     }
 }
 
-moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &Act1::Actor::queue() {
-    return __queue;
+MessageQueue &Act1::Actor::queue() {
+    return m_queue;
+}
+
+void Act1::MessageQueue::enqueue(std::function<void(void)> &&m) {
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    m_queue.emplace(std::move(m));
+    m_queue_wait_condition.notify_one();
+}
+
+void Act1::MessageQueue::dequeue(std::function<void(void)> & item) {
+    std::unique_lock<std::mutex> lock(m_queue_mutex);
+    m_queue_wait_condition.wait(lock, [this] {
+        return ! m_queue.empty();
+    });
+
+    item = std::move(m_queue.front());
+    m_queue.pop();
+}
+
+std::thread Act1::start_actor(Actor &a) {
+    return std::thread(&Actor::run, &a);
 }

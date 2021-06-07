@@ -23,17 +23,20 @@
 #ifndef _HEADER_FILE_act1_20210525191648_
 #define _HEADER_FILE_act1_20210525191648_
 
-#include "readerwriterqueue.h"
 #include <cstdint>
 #include <functional>
+#include <condition_variable>
+#include <thread>
+#include <mutex>
+#include <queue>
 
 namespace Act1 {
 
     class Actor;
 
     template<typename T>
-    struct MessageEnvelope {
-        Actor *sender_id;
+    struct Message {
+        Actor *sender;
         T data;
     };
 
@@ -41,38 +44,51 @@ namespace Act1 {
         KILL
     };
 
+    class MessageQueue {
+    public:
+        void enqueue(std::function<void(void)> && m);
+        void dequeue(std::function<void(void)> & item);
+
+    private:
+        std::queue<std::function<void(void)>> m_queue;
+        std::condition_variable m_queue_wait_condition;
+        std::mutex m_queue_mutex;
+    };
+
     class Actor {
     public:
         template<typename U, typename ActorSubType>
-        bool send(ActorSubType &actor, U const & msg) {
-            return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
+        void send(ActorSubType &actor, U const & msg) {
+            actor.queue()
+                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
                     actor.reaction(env);
                 });
         }
 
         template<typename U, typename ActorSubType>
-        bool send(ActorSubType &actor, U const && msg) {
-            return actor.queue()
-                .try_enqueue([&actor, env=MessageEnvelope<U>{this, std::move(msg)}] {
+        void send(ActorSubType &actor, U const && msg) {
+            actor.queue()
+                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
                     actor.reaction(env);
                 });
         }
 
-        bool signal(Actor &actor, ActorSignal signal);
+        void signal(Actor &actor, ActorSignal signal);
 
-        bool signal(ActorSignal signal);
+        void signal(ActorSignal signal);
 
         void run(void);
 
-        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> &queue();
+        MessageQueue &queue();
 
     private:
         void signal_reaction(ActorSignal signal);
 
-        moodycamel::BlockingReaderWriterQueue<std::function<void(void)>> __queue;
-        bool __received_kill = false;
+        MessageQueue m_queue;
+        bool m_received_kill = false;
     };
+
+    std::thread start_actor(Actor &a);
 
 };
 
