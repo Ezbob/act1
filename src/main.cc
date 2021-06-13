@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <ostream>
 
 #include <thread>
@@ -9,55 +10,60 @@
 
 class PongActor;
 
-
-class PingActor : public Act1::Actor {
+class PingActor : public Act1::Actor<PingActor> {
 public:
-    PongActor *pong_actor = nullptr;
+    std::weak_ptr<PongActor> sender;
 
-    void reaction(const Act1::Message<int> &m) {
-        std::cout << "Ping " << m.data << "\n";
-        send(*pong_actor, m.data + 1);
+    void reaction(const int &m) {
+        if ( std::shared_ptr<PongActor> p = sender.lock() ) {
+            std::cout << "Ping " << m << "\n";
+            send(p, m + 1);
+        }
     }
 
-    void reaction(const Act1::Message<std::string> &m) {
-        std::cout << "Ping " << m.data << "\n";
-        send(*pong_actor, m.data);
+    void reaction(const std::string &m) {
+        if ( std::shared_ptr<PongActor> p = sender.lock() ) {
+            std::cout << "Ping " << m << "\n";
+            send(p, m);
+        }
     }
 };
 
 
-class PongActor : public Act1::Actor {
+class PongActor : public Act1::Actor<PingActor> {
 public:
-    PingActor *ping_actor = nullptr;
+    std::weak_ptr<PingActor> sender;
 
-    void reaction(const Act1::Message<int> &m) {
-        std::cout << "Pong " << m.data << "\n";
+    void reaction(const int &m) {
+        if ( std::shared_ptr<PingActor> p = sender.lock() ) {
+            std::cout << "Pong " << m << "\n";
+            if (m >= 10) {
+                send(p, Act1::ActorSignal::KILL);
+                send(Act1::ActorSignal::KILL);
+            }
 
-        if (m.data >= 10) {
-            send(*ping_actor, Act1::ActorSignal::KILL);
-            send(*this, Act1::ActorSignal::KILL);
+            send(p, m + 1);
         }
-
-        send(*ping_actor, m.data + 1);
     }
 
-    void reaction(const Act1::Message<std::string> &m) {
-        std::cout << "Pong " << m.data << "\n";
-        send(*ping_actor, m.data);
+    void reaction(const std::string &m) {
+        if ( std::shared_ptr<PingActor> p = sender.lock() ) {
+            std::cout << "Pong " << m << "\n";
+            send(p, m);
+        }
     }
 };
 
 
 int main() {
+    auto ping = std::make_shared<PingActor>();
+    auto pong = std::make_shared<PongActor>();
 
-    PingActor ping;
-    PongActor pong;
+    ping->sender = pong;
+    pong->sender = ping;
 
-    ping.pong_actor = &pong;
-    pong.ping_actor = &ping;
-
-    pong.send(ping, 0);
-    ping.send<std::string>(pong, "Hello");
+    pong->send(ping, 0);
+    ping->send<std::string>(pong, "Hello");
 
     std::thread w = Act1::start_actor(ping);
     std::thread r = Act1::start_actor(pong);

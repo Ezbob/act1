@@ -24,29 +24,6 @@
 
 using namespace Act1;
 
-void Actor::signal_reaction(ActorSignal signal) {
-    switch (signal) {
-        case ActorSignal::KILL:
-            m_received_kill = true;
-            break;
-    }
-}
-
-void Actor::run(void) {
-    thread_local std::function<void(void)> reaction;
-    for (;;) {
-        m_queue.dequeue(reaction);
-        reaction();
-
-        if (m_received_kill) {
-            break;
-        }
-    }
-}
-
-MessageQueue &Actor::queue() {
-    return m_queue;
-}
 
 void MessageQueue::enqueue(std::function<void(void)> &&m) {
     std::lock_guard<std::mutex> lock(m_queue_mutex);
@@ -62,8 +39,4 @@ void MessageQueue::dequeue(std::function<void(void)> & item) {
 
     item = std::move(m_queue.front());
     m_queue.pop();
-}
-
-std::thread Act1::start_actor(Actor &a) {
-    return std::thread(&Actor::run, &a);
 }

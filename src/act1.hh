@@ -26,19 +26,13 @@
 #include <cstdint>
 #include <functional>
 #include <condition_variable>
+#include <memory>
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <type_traits>
 
 namespace Act1 {
-
-    class Actor;
-
-    template<typename T>
-    struct Message {
-        Actor *sender;
-        T data;
-    };
 
     enum class ActorSignal {
         KILL
@@ -55,45 +49,74 @@ namespace Act1 {
         std::mutex m_queue_mutex;
     };
 
+    template<typename Derived_t>
     class Actor {
     public:
-        template<typename U, typename A, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
-        void send(A &actor, U const & data) {
-            actor.queue()
-                .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
-                    actor.reaction(message);
+        template<typename U, typename APtr, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
+        void send(APtr actor, U const && data) {
+            actor->queue()
+                .enqueue([actor, msg=std::move(data)] {
+                    actor->reaction(msg);
                 });
         }
 
-        template<typename U, typename A, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
-        void send(A &actor, U const && data) {
-            actor.queue()
-                .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
-                    actor.reaction(message);
+        template<typename U, typename APtr, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
+        void send(APtr actor, U const & data) {
+            actor->queue()
+                .enqueue([actor, msg=std::move(data)] {
+                    actor->reaction(msg);
                 });
         }
 
-        template<typename U, typename A, typename std::enable_if<std::is_same<U, ActorSignal>::value, int>::type = 0>
-        void send(A &actor, U const signal) {
-            actor.queue()
-                .enqueue([&actor, signal] {
-                    actor.signal_reaction(signal);
+        template<typename U, typename std::enable_if<std::is_same<U, ActorSignal>::value, int>::type = 0>
+        void send(U const signal) {
+            queue()
+                .enqueue([this, signal] {
+                    signal_reaction(signal);
                 });
         }
 
-        void run(void);
+        template<typename U, typename APtr, typename std::enable_if<std::is_same<U, ActorSignal>::value, int>::type = 0>
+        void send(APtr actor, U const signal) {
+            actor->queue()
+                .enqueue([actor, signal] {
+                    actor->signal_reaction(signal);
+                });
+        }
 
-        MessageQueue &queue();
+        void run(void) {
+            thread_local std::function<void(void)> reaction;
+            for (;;) {
+                m_queue.dequeue(reaction);
+                reaction();
+
+                if (m_received_kill) {
+                    break;
+                }
+            }
+        }
+
+        MessageQueue &queue() {
+            return m_queue;
+        }
 
     private:
-        void signal_reaction(ActorSignal signal);
+        void signal_reaction(ActorSignal signal) {
+            switch (signal) {
+                case ActorSignal::KILL:
+                    m_received_kill = true;
+                    break;
+            }
+        }
 
         MessageQueue m_queue;
         bool m_received_kill = false;
     };
 
-    std::thread start_actor(Actor &a);
-
+    template<typename ActorType>
+    std::thread start_actor(std::shared_ptr<ActorType> &a) {
+        return std::thread([&a] {a->run();});
+    }
 };
 
 #endif
