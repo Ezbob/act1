@@ -24,19 +24,6 @@
 
 using namespace Act1;
 
-void Actor::signal(Actor &actor, ActorSignal signal) {
-    actor.queue()
-        .enqueue([&actor, signal] {
-            actor.signal_reaction(signal);
-        });
-}
-
-void Actor::signal(ActorSignal signal) {
-    m_queue.enqueue([this, signal] {
-        signal_reaction(signal);
-    });
-}
-
 void Actor::signal_reaction(ActorSignal signal) {
     switch (signal) {
         case ActorSignal::KILL:

@@ -34,8 +34,8 @@ public:
         std::cout << "Pong " << m.data << "\n";
 
         if (m.data >= 10) {
-            signal(*ping_actor, Act1::ActorSignal::KILL);
-            signal(Act1::ActorSignal::KILL);
+            send(*ping_actor, Act1::ActorSignal::KILL);
+            send(*this, Act1::ActorSignal::KILL);
         }
 
         send(*ping_actor, m.data + 1);

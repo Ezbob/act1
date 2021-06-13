@@ -57,7 +57,7 @@ namespace Act1 {
 
     class Actor {
     public:
-        template<typename U, typename A>
+        template<typename U, typename A, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
         void send(A &actor, U const & data) {
             actor.queue()
                 .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
@@ -65,7 +65,7 @@ namespace Act1 {
                 });
         }
 
-        template<typename U, typename A>
+        template<typename U, typename A, typename std::enable_if<!std::is_same<U, ActorSignal>::value, int>::type = 0>
         void send(A &actor, U const && data) {
             actor.queue()
                 .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
@@ -73,9 +73,13 @@ namespace Act1 {
                 });
         }
 
-        void signal(Actor &actor, ActorSignal signal);
-
-        void signal(ActorSignal signal);
+        template<typename U, typename A, typename std::enable_if<std::is_same<U, ActorSignal>::value, int>::type = 0>
+        void send(A &actor, U const signal) {
+            actor.queue()
+                .enqueue([&actor, signal] {
+                    actor.signal_reaction(signal);
+                });
+        }
 
         void run(void);
 
