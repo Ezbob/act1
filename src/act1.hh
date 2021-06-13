@@ -57,19 +57,19 @@ namespace Act1 {
 
     class Actor {
     public:
-        template<typename U, typename ActorSubType>
-        void send(ActorSubType &actor, U const & msg) {
+        template<typename U, typename A>
+        void send(A &actor, U const & data) {
             actor.queue()
-                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
-                    actor.reaction(env);
+                .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
+                    actor.reaction(message);
                 });
         }
 
-        template<typename U, typename ActorSubType>
-        void send(ActorSubType &actor, U const && msg) {
+        template<typename U, typename A>
+        void send(A &actor, U const && data) {
             actor.queue()
-                .enqueue([&actor, env=Message<U>{this, std::move(msg)}] {
-                    actor.reaction(env);
+                .enqueue([&actor, message=Message<U>{this, std::move(data)}] {
+                    actor.reaction(message);
                 });
         }
 
